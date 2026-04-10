@@ -480,7 +480,6 @@ async def bank_withdraw(message: types.Message):
     if user.get('bank', 0) < amount:
         await message.answer(f"❌ *В банке только {user.get('bank', 0):,} ₽*", parse_mode="Markdown")
         return
-    percent = get_bank_percent(user['bank_level'])
     tax = int(amount * 0.04)
     final = amount - tax
     user['bank'] -= amount
