@@ -213,6 +213,81 @@ def update_quest_progress(user_id, qtype, amount=1, money_earned=0):
         user['daily_quests']['quests'] = quests
         save_user(user_id, user)
 
+def add_game_result(user_id, win):
+    user = init_user(user_id, "")
+    user["games_played"] = user.get("games_played", 0) + 1
+    if win:
+        user["wins"] = user.get("wins", 0) + 1
+    save_user(user_id, user)
+    update_quest_progress(user_id, "games", 1)
+    if win:
+        update_quest_progress(user_id, "wins", 1)
+    check_achievements(user_id)
+
+def check_achievements(user_id):
+    user = init_user(user_id, "")
+    achievements = user.get('achievements', {})
+    changed = False
+    if user["games_played"] >= 100 and not achievements.get("games_100"):
+        achievements["games_100"] = True
+        add_diamonds(user_id, 100)
+        asyncio.create_task(bot.send_message(user_id, "🏆 Достижение: 100 игр! +100💎"))
+        changed = True
+    elif user["games_played"] >= 50 and not achievements.get("games_50"):
+        achievements["games_50"] = True
+        add_diamonds(user_id, 50)
+        asyncio.create_task(bot.send_message(user_id, "🏆 Достижение: 50 игр! +50💎"))
+        changed = True
+    elif user["games_played"] >= 10 and not achievements.get("games_10"):
+        achievements["games_10"] = True
+        add_diamonds(user_id, 10)
+        asyncio.create_task(bot.send_message(user_id, "🏆 Достижение: 10 игр! +10💎"))
+        changed = True
+    if user["wins"] >= 50 and not achievements.get("wins_50"):
+        achievements["wins_50"] = True
+        add_diamonds(user_id, 75)
+        asyncio.create_task(bot.send_message(user_id, "🏆 Достижение: 50 побед! +75💎"))
+        changed = True
+    elif user["wins"] >= 20 and not achievements.get("wins_20"):
+        achievements["wins_20"] = True
+        add_diamonds(user_id, 30)
+        asyncio.create_task(bot.send_message(user_id, "🏆 Достижение: 20 побед! +30💎"))
+        changed = True
+    elif user["wins"] >= 5 and not achievements.get("wins_5"):
+        achievements["wins_5"] = True
+        add_diamonds(user_id, 10)
+        asyncio.create_task(bot.send_message(user_id, "🏆 Достижение: 5 побед! +10💎"))
+        changed = True
+    if user.get('business') and not achievements.get("business"):
+        achievements["business"] = True
+        add_diamonds(user_id, 50)
+        asyncio.create_task(bot.send_message(user_id, "🏆 Достижение: Владелец бизнеса! +50💎"))
+        changed = True
+    if user["balance"] >= 1000000 and not achievements.get("million"):
+        achievements["million"] = True
+        add_diamonds(user_id, 100)
+        asyncio.create_task(bot.send_message(user_id, "🏆 Достижение: Миллионер! +100💎"))
+        changed = True
+    if changed:
+        user["achievements"] = achievements
+        save_user(user_id, user)
+
+def get_rank_info(user_id):
+    user = init_user(user_id, "")
+    balance = user['balance']
+    if balance >= 1000000000:
+        return "👑 Олигарх", "Максимальный ранг", 0
+    elif balance >= 100000000:
+        return "💎 Магнат", "👑 Олигарх", 1000000000 - balance
+    elif balance >= 10000000:
+        return "🏆 Миллионер", "💎 Магнат", 100000000 - balance
+    elif balance >= 1000000:
+        return "⭐ Богач", "🏆 Миллионер", 10000000 - balance
+    elif balance >= 100000:
+        return "💰 Состоятельный", "⭐ Богач", 1000000 - balance
+    else:
+        return "🟤 Новичок", "💰 Состоятельный", 100000 - balance
+
 main_keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="💰 Баланс"), KeyboardButton(text="🏦 Банк")],
@@ -305,7 +380,8 @@ async def promo_vanek(message: types.Message):
             f"💎 Всего использовано: {used_count + 1}/1000",
             parse_mode="Markdown"
         )
-        # ============ КОМАНДА START ============
+
+# ============ КОМАНДА START ============
 @dp.message(Command("start"))
 async def start(message: types.Message):
     init_user(message.from_user.id, message.from_user.username)
@@ -356,7 +432,7 @@ async def bank_menu(message: types.Message):
         f"💎 Стоимость прокачки: {get_upgrade_cost(user['bank_level']):,} ₽\n\n"
         f"📌 **Команды:**\n"
         f"• `Банк пополнить [сумма]`\n"
-        f"• `Банк снять [сума]`\n"
+        f"• `Банк снять [сумма]`\n"
         f"• `Банк прокачать`\n\n"
         f"💡 Каждый час начисляется {percent:.2f}% от суммы в банке!",
         parse_mode="Markdown"
@@ -653,7 +729,8 @@ async def upgrade_farm(message: types.Message):
         f"💰 Новый доход: {new_income:,} ₽/30 мин",
         parse_mode="Markdown"
     )
-    # ============ КАРЬЕР ============
+
+# ============ КАРЬЕР ============
 @dp.message(lambda msg: msg.text == "⚠️ Карьер")
 async def quarry_menu(message: types.Message):
     user = init_user(message.from_user.id, message.from_user.username)
@@ -1037,7 +1114,8 @@ async def open_case(message: types.Message):
         f"💰 +{total_reward:,} {case_info['currency']}",
         parse_mode="Markdown"
     )
-    # ============ БОСС ============
+
+# ============ БОСС ============
 @dp.message(lambda msg: msg.text == "👹 Босс")
 async def boss_menu(message: types.Message):
     user = init_user(message.from_user.id, message.from_user.username)
@@ -1456,7 +1534,8 @@ async def invest_action(callback: types.CallbackQuery):
     user['investments']['price'] = new_price
     save_user(callback.from_user.id, user)
     await callback.answer()
-    # ============ КЛАНЫ ============
+
+# ============ КЛАНЫ ============
 @dp.message(lambda msg: msg.text == "🏛 Кланы")
 async def clans_menu(message: types.Message):
     await message.answer(
